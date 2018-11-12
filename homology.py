@@ -1,5 +1,3 @@
-import random
-
 MATRIX_INCONSISTENT_DIMENSIONS = 0
 MATRIX_NOT_CHAIN_MAPS = 1
 
@@ -216,7 +214,7 @@ class MatrixProcessor(object):
             # if second_matrix is not None, then we switch columns of the M1 matrix
             self._transform = self._helper.multiply_matrices(self._transform, [[self._switch_transfrom_value(i, j, column_i, column_j) for j in range(self._m1_base)] for i in range(self._m1_base)], (self._m1_base, self._m1_base), (self._m1_base, self._m1_base))
 
-    def _switch_row(self, matrix, dim, min_column, row_i, row_j, second_matrix=None, second_dim=(0, 0)):
+    def _switch_row(self, matrix, dim, min_column, row_i, row_j, second_matrix=None, second_dim=(0, 0), save_to_transform=False):
         '''If second matrix is not None, switch columns of it
         '''
         for k in range(min_column, dim[1]):
@@ -228,14 +226,17 @@ class MatrixProcessor(object):
                 c = second_matrix[k][row_i]
                 second_matrix[k][row_i] = second_matrix[k][row_j]
                 second_matrix[k][row_j] = c
+        if second_matrix is not None or save_to_transform:
             self._transform = self._helper.multiply_matrices(self._transform, [[self._switch_transfrom_value(i, j, row_i, row_j) for j in range(self._m1_base)] for i in range(self._m1_base)], (self._m1_base, self._m1_base), (self._m1_base, self._m1_base))
 
-    def _negate_row(self, matrix, dim, min_column, row_i, secondary_matrix=None, secondary_dim=(0, 0)):
+    def _negate_row(self, matrix, dim, min_column, row_i, secondary_matrix=None, secondary_dim=(0, 0), save_to_transform=False):
         for k in range(min_column, dim[1]):
             matrix[row_i][k] *= -1
         if secondary_matrix is not None:
             for k in range(secondary_dim[0]):
                 secondary_matrix[k][row_i] *= -1
+        if save_to_transform:
+            self._transform = self._helper.multiply_matrices(self._transform, [[self._negate_transform_value(i, j, row_i) for j in range(self._m1_base)] for i in range(self._m1_base)], (self._m1_base, self._m1_base), (self._m1_base, self._m1_base))
 
     def _negate_column(self, matrix, dim, min_row, column_i, secondary_matrix=None, secondary_dim=(0, 0)):
         for k in range(min_row, dim[0]):
@@ -245,13 +246,13 @@ class MatrixProcessor(object):
                 secondary_matrix[column_i][k] *= -1
             self._transform = self._helper.multiply_matrices(self._transform, [[self._negate_transform_value(i, j, column_i) for j in range(self._m1_base)] for i in range(self._m1_base)], (self._m1_base, self._m1_base), (self._m1_base, self._m1_base))
 
-    def _add_row(self, matrix, dim, min_column, row_i, row_j, coefficient, write_transform=False):
+    def _add_row(self, matrix, dim, min_column, row_i, row_j, coefficient, save_to_transform=False):
         '''Add row_i to the row_j with coefficient c
-        If write_transform=True, then we should save transformation in transform matrix, because we make it fro M2 and change the basis of the M1
+        If save_to_transform=True, then we should save transformation in transform matrix, because we make it fro M2 and change the basis of the M1
         '''
         for k in range(min_column, dim[1]):
             matrix[row_j][k] += coefficient * matrix[row_i][k]
-        if write_transform:
+        if save_to_transform:
             self._transform = self._helper.multiply_matrices(self._transform, [[self._add_transform_value(i, j, row_j, row_i, -1*coefficient) for j in range(self._m1_base)] for i in range(self._m1_base)], (self._m1_base, self._m1_base), (self._m1_base, self._m1_base))
 
     def _add_column(self, matrix, dim, min_row, column_i, column_j, coefficient, secondary_matrix=None, secondary_dim=(0, 0)):
@@ -327,17 +328,17 @@ class MatrixProcessor(object):
             while not self._is_row_column_zero(self._m2, m2_dim, step + shift, step):
                 pos = self._get_minimal_coordinates(self._m2, m2_dim, step + shift, step)
                 if pos[0] != step + shift:
-                    self._switch_row(self._m2, m2_dim, step, step + shift, pos[0])
+                    self._switch_row(self._m2, m2_dim, step, step + shift, pos[0], save_to_transform=True)
                 if pos[1] != step:
                     self._switch_columns(self._m2, m2_dim, step + shift, step, pos[1])
                 if self._m2[step + shift][step] < 0:
-                    self._negate_row(self._m2, m2_dim, step, step + shift)
+                    self._negate_row(self._m2, m2_dim, step, step + shift, save_to_transform=True)
                 a = self._m2[step + shift][step]
                 for k in range(step + shift + 1, m2_dim[0]):
                     v = self._m2[k][step]
                     if v != 0:
                         c = abs(v) // a
-                        self._add_row(self._m2, m2_dim, step, step + shift, k, c if v < 0 else -1*c, True)
+                        self._add_row(self._m2, m2_dim, step, step + shift, k, c if v < 0 else -1*c, save_to_transform=True)
                 for k in range(step + 1, m2_dim[1]):
                     v = self._m2[step + shift][k]
                     if v != 0:
@@ -372,27 +373,41 @@ class ChainComplex(object):
         self._homology = {}  # key - group index, value - link to MatrixProcessor with reducted matrixes. If there is no key, the this homology froup are not calculated yet
 
     def generate_cochain_complex(self):
+        '''Generate cochain complex which is dual to the gieven chain complex. If the current complex is cochain, then None is returned
+        '''
         if self._is_cochain is True:
             print("Complex is cochain, nothing to generate.")
             return None
         else:
-            cc = ChainComplex(is_cochain=True)  # create cochain complex
-            # copy groups dimensions
-            for g_index in self._dimensions.keys():
-                cc.add_group(g_index, self._dimensions[g_index])
-            # find maximal and minimal index
-            indexes = list(self._dimensions.keys())
-            indexes.sort()
-            min_index = indexes[0]
-            max_index = indexes[len(indexes) - 1]
-            # copy boundaries, get it from previous group
-            for index in range(min_index, max_index):
-                if index + 1 in self._boundaries.keys():
-                    cc.add_boundary_map(index, self._helper.build_transpose(self._boundaries[index + 1]))
-            # copy factors
-            for f_index in self._factors.keys():
-                cc.add_factor(f_index, [f for f in self._factors[f_index]])
-            return cc
+            return self._get_transpose_complex()
+
+    def _get_transpose_complex(self):
+        cc = ChainComplex(is_cochain=not self._is_cochain)  # create cochain complex
+        # copy groups dimensions
+        for g_index in self._dimensions.keys():
+            cc.add_group(g_index, self._dimensions[g_index])
+        # find maximal and minimal index
+        indexes = list(self._dimensions.keys())
+        indexes.sort()
+        min_index = indexes[0]
+        max_index = indexes[len(indexes) - 1]
+        # copy boundaries, get it from previous group
+        for index in range(min_index, max_index):
+            if index + 1 in self._boundaries.keys():
+                cc.add_boundary_map(index, self._helper.build_transpose(self._boundaries[index + 1]))
+        # copy factors
+        for f_index in self._factors.keys():
+            cc.add_factor(f_index, [f for f in self._factors[f_index]])
+        return cc
+
+    def generate_chain_complex(self):
+        '''Generate chain complex which is dual to the given cochain complex. If the current complex is chain, then None is returned
+        '''
+        if self._is_cochain is False:
+            print("Complex is chain, nothing to generate")
+            return None
+        else:
+            return self._get_transpose_complex()
 
     def add_group(self, index, dimension):
         '''Add group to the chain complex with specific index and specific dimension. If the group with this index already presented in the chain complex, then it will be overrided and computed homology will be droped.
@@ -614,23 +629,8 @@ class ChainComplex(object):
         return "->".join(str_array)
 
 
-def get_matrix_pair():
-    dim1 = (3, 3)
-    dim2 = (3, 2)
-    limit = 2
-    is_find = False
-    while not is_find:
-        # generate ranom matrix
-        matrix1 = [[random.randint(-1*limit, limit) for j in range(dim1[1])] for i in range(dim1[0])]
-        matrix2 = [[random.randint(-1*limit, limit) for j in range(dim2[1])] for i in range(dim2[0])]
-        # check correctness
-        mp = MatrixProcessor(matrix1, matrix2)
-        if mp.get_is_correct():
-            is_find = True
-            return (matrix1, matrix2)
-
-
-def example():
+def example_basic():
+    print("Example basic output:")
     helper = MatrixHelper()  # helper for matrix outputs
     # 1. Create chain complex
     cc = ChainComplex()
@@ -655,5 +655,30 @@ def example():
         for v_index in range(len(orders)):
             print("\t order " + str(orders[v_index]) + ": " + str(cc.get_generator(i, v_index)))
 
+
+def example_convert_complex():
+    print("Example of conversion output:")
+    helper = MatrixHelper()
+    # 1. Create chain complex
+    cc = ChainComplex()
+    # consinder 0->C_2->C_1->0, where C_2 is 4-dim and C_1 is 3-dim
+    # 2. Add groups
+    cc.add_group(2, 4)
+    cc.add_group(1, 3)
+    # 3. Add boundary map from C_2 to C_1
+    cc.add_boundary_map(2, [[1, -1, 2, 1], [2, -1, 3, -3], [1, -1, 1, -1]])
+    # 4. Build corresponding cochain complex
+    ccc = cc.generate_cochain_complex()
+    # 5. calculate cohomology groups
+    h1 = ccc.get_homology(1)
+    h2 = ccc.get_homology(2)
+    print("H^1 = " + helper.orders_to_string(h1))
+    print("H^2 = " + helper.orders_to_string(h2))
+    # 6. Show the generater cocycle for the H^2
+    print(h2)
+    for v_index in range(len(h2)):
+        print("H^2 generator " + str(v_index) + ": " + str(ccc.get_generator(2, v_index)) + " has order " + str(h2[v_index]))
+
 if __name__ == "__main__":
-    example()
+    example_basic()
+    example_convert_complex()
