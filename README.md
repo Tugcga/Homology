@@ -9,12 +9,12 @@ This is the pure Python module for calculating homology groups of free chain com
 import homology
 ```
 
-2. Create chain complex object
+2. Create the chain complex object
 ```
 cc = ChainComplex()
 ```
 
-3. Add groups ot the complex
+3. Add groups to the complex
 ```
 cc.add_group(i, dim)
 ```
@@ -29,7 +29,7 @@ cc.add_boundary_map(i, matrix)
 orders = cc.get_homology(i)
 ```
 
-the result is a tuple (a1, a2, ...) and it means that H_i = Z_a1 + Z_a2 + ...
+the result is a tuple (a1, a2, ...) and it means that H_i = Z_a1 + Z_a2 + ... Order 0 means that this summand is infinite cyclic group.
 
 6. Get coordinates of the group summand generators
 ```
