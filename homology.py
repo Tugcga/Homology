@@ -290,11 +290,11 @@ class MatrixProcessor(object):
         steps_count = min(m1_dim[0], m1_dim[1])
         for step in range(steps_count):
             # for each step consider submatrix of the M1 from (step, step) element
-            # check if we should zerofy row or colum
-            while not self._is_row_column_zero(self._m1, m1_dim, step, step):
-                # step-row or step-column are not zero, we should zerofy it
-                # find minimal non-zero value in submatrix
-                pos = self._get_minimal_coordinates(self._m1, m1_dim, step, step)
+            # check if there are non-zero elements in reduction segment
+            pos = self._get_minimal_coordinates(self._m1, m1_dim, step, step)
+            should_do = pos != (-1, -1)
+            while should_do:
+                # there is non-zero element in the sumbatrix
                 # transpose (step, step)-element with pos-element, if we need it
                 if pos[0] != step:
                     self._switch_row(self._m1, m1_dim, step, step, pos[0])
@@ -317,6 +317,8 @@ class MatrixProcessor(object):
                     if v != 0:
                         c = abs(v) // a
                         self._add_column(self._m1, m1_dim, step, step, k, c if v < 0 else -1*c, self._m2, m2_dim)
+                pos = self._get_minimal_coordinates(self._m1, m1_dim, step, step)
+                should_do = pos == (-1, -1)
         # 2. Next reduce M2 without any effects on the M1
         # Find the number of non-zero elements in the diagonal of the M1
         shift = self._get_diagonal_length(self._m1, m1_dim)
