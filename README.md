@@ -1,6 +1,6 @@
 # Homology
 
-This is the pure Python module for calculating homology groups of free chain complexes.It allows to calculate simplicial homology and cohomology groups. Also it can be used for calculating Khovanov homology of knots, Carter cohomology groups for 2-cocycle invariants of knots and so on.
+This is the pure Python module for calculating homology groups of free chain complexes. It allows to calculate simplicial homology and cohomology groups. Also it can be used for calculating Khovanov homology of knots, Carter cohomology groups for 2-cocycle invariants of knots and so on.
 
 ## How to use
 
