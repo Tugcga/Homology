@@ -1,3 +1,8 @@
+from fractions import Fraction
+from math import gcd
+from functools import reduce
+
+
 MATRIX_INCONSISTENT_DIMENSIONS = 0
 MATRIX_NOT_CHAIN_MAPS = 1
 
@@ -72,6 +77,86 @@ class MatrixHelper(object):
             return " + ".join(str_array)
         else:
             return "0"
+
+    def lcm(self, a, b):
+        return a * b // gcd(a, b)
+
+    def lcm_n(self, *args):
+        return reduce(self.lcm, args)
+
+    def get_matrix_kernel(self, matrix):
+        '''Return the basis of the matrix kernel.
+
+        The result is an array of tuples. Each tuple has the same length as the count of columns in the original matrix
+        '''
+        # make a copy of the matrix and convert it values to rational fractions
+        m = [[Fraction(v, 1) for v in r] for r in matrix]
+        # start gauss process, the number of steps is min(rows, columns)
+        column_index = 0  # the indexes of the upper left corner of the considered submatrix
+        row_index = 0
+        while column_index < len(m[0]) and row_index < len(m):
+            # try to find the first row with non-zero element in the column column_index with (rows start from row_index)
+            is_find = False
+            i = row_index
+            while not is_find:
+                if m[i][column_index] != 0:
+                    is_find = True
+                else:
+                    i += 1
+                if i >= len(m):
+                    is_find = True
+            if i >= len(m):
+                # no non-zero elements in the column, siply increase it
+                column_index += 1
+                # and start next iteration
+            else:
+                # swap i-th row with row_index row
+                # do it only for elements in column_index+ columns
+                a = m[i][column_index]
+                for j in range(column_index, len(m[row_index])):
+                    m[row_index][j], m[i][j] = m[i][j], m[row_index][j]
+                    # divide all elements in the row_index row to the first one
+                    m[row_index][j] = m[row_index][j] / a
+                # zerofy all elements in the column_index colum
+                for j in range(len(m)):
+                    # iterate throw rows
+                    if j != row_index:
+                        a = m[j][column_index]
+                        for k in range(column_index, len(m[j])):
+                            m[j][k] = m[j][k] - a * m[row_index][k]
+                # increase row and column indexes
+                row_index += 1
+                column_index += 1
+        # next we should generate basis of the kernel
+        # devide all variables to main and passive
+        main_vars = []
+        passive_vars = []
+        i = 0
+        j = 0
+        while i < len(m) and j < len(m[0]):
+            if m[i][j] != 0:
+                main_vars.append(j)
+                i += 1
+                j += 1
+            else:
+                passive_vars.append(j)
+                j += 1
+        for k in range(j, len(m[0])):
+            passive_vars.append(k)
+        kernel = []
+        for i in range(len(passive_vars)):
+            var_index = passive_vars[i]
+            vector = [0 for j in range(len(m[0]))]
+            # calculate var_index value as LCM of all denominators in the corresponding column
+            vector[var_index] = self.lcm_n(*[m[j][var_index].denominator for j in range(len(m))])
+            # calculate all main variables
+            for j in range(len(main_vars)):
+                main_var_index = main_vars[j]
+                vector[main_var_index] = -1 * vector[var_index] * m[j][var_index]
+
+            # add vector to the answer
+            kernel.append(tuple(int(v) for v in vector))
+        return kernel
 
     def get_error_string(self, error_code):
         if error_code == MATRIX_INCONSISTENT_DIMENSIONS:
@@ -494,6 +579,15 @@ class ChainComplex(object):
             to_dim = self.get_dimension(index + 1 if self._is_cochain else index - 1)
             return self._helper.build_constant_matrix((to_dim, from_dim), is_tuples=True)
 
+    def get_boundary_map_kernel(self, index):
+        '''Return an array of vectors, which form the basis of the boundary map kernel
+        '''
+        if index in self._boundaries.keys():
+            helper = MatrixHelper()
+            return helper.get_matrix_kernel(self._boundaries[index])
+        else:
+            return [tuple(1 if i == j else 0 for j in range(self.get_dimension(index))) for i in range(self.get_dimension(index))]
+
     def calculate_homology(self, index, force_recalculate=False):
         if (index in self._homology and self._homology[index].get_is_reducted() is False) or (index not in self._homology) or (force_recalculate is True):
             current_dim = self.get_dimension(index)
@@ -680,6 +774,7 @@ def example_convert_complex():
     print(h2)
     for v_index in range(len(h2)):
         print("H^2 generator " + str(v_index) + ": " + str(ccc.get_generator(2, v_index)) + " has order " + str(h2[v_index]))
+
 
 if __name__ == "__main__":
     example_basic()
