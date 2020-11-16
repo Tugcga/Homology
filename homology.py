@@ -158,6 +158,80 @@ class MatrixHelper(object):
             kernel.append(tuple(int(v) for v in vector))
         return kernel
 
+    def reduce(self, matrix):
+        '''Apply Gauss process to the matrix. Use only integer numbers and use row transforms
+        '''
+        # create copy of the matrix
+        def is_zero_row(row):
+            for v in row:
+                if v != 0:
+                    return False
+            return True
+
+        m = [[v for v in row]for row in matrix]
+        height = len(m)  # the number of rows in the matrix
+        width = len(m[0])  # the number of columns in the matrix
+        row_index = 0
+        column_index = 0
+        while row_index < height and column_index < width:
+            # find the minimum number (by absolute value) in the column column_index in the rows after row_index
+            c_min = None
+            c_min_index = -1
+            for i in range(row_index, height):
+                if m[i][column_index] != 0:
+                    v = abs(m[i][column_index])
+                    if c_min is None:
+                        c_min = v
+                        c_min_index = i
+                    else:
+                        if v < c_min:
+                            c_min = v
+                            c_min_index = i
+            if c_min_index == -1:
+                # there are no non-zero elements in the column, start next step
+                column_index += 1
+            else:
+                if c_min_index != row_index:
+                    # switch two rows
+                    for k in range(column_index, width):
+                        m[c_min_index][k], m[row_index][k] = m[row_index][k], m[c_min_index][k]
+                if m[row_index][column_index] < 0:
+                    for k in range(column_index, width):
+                        m[row_index][k] *= -1
+                # decrease values in the column
+                a = abs(m[row_index][column_index])
+                for i in range(height):
+                    # iterate by all rows
+                    if i != row_index:
+                        b = abs(m[i][column_index])
+                        if b >= a:
+                            # apply transform to the row i
+                            c = (-1 if m[row_index][column_index] * m[i][column_index] > 0 else 1) * b // a
+                            for j in range(column_index, width):
+                                m[i][j] = m[i][j] + c * m[row_index][j]
+                # check, are all elements in the column now = 0
+                is_zeros = True
+                is_finish = False
+                i = row_index + 1
+                while not is_finish:
+                    if i >= height:
+                        is_finish = True
+                    else:
+                        if m[i][column_index] != 0:
+                            is_zeros = False
+                            is_finish = True
+                        i += 1
+                if is_zeros:
+                    row_index += 1
+                    column_index += 1
+        # remove zero rows
+        to_return = []
+
+        for i in range(height):
+            if not is_zero_row(m[i]):
+                to_return.append(tuple(v for v in m[i]))
+        return to_return
+
     def get_error_string(self, error_code):
         if error_code == MATRIX_INCONSISTENT_DIMENSIONS:
             return "Inconsistend dimensions of matrices."
