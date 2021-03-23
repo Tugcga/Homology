@@ -1,5 +1,6 @@
 from fractions import Fraction
 from math import gcd
+import functools
 
 
 MATRIX_INCONSISTENT_DIMENSIONS = 0
@@ -87,7 +88,7 @@ def int_lcm(a, b):
 
 
 def lcm_n(*args):
-    return reduce(int_lcm, args)
+    return functools.reduce(int_lcm, args)
 
 
 def get_matrix_kernel(matrix):
