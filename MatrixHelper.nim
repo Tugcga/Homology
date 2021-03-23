@@ -1,6 +1,9 @@
 import math
 import bigints
 import nimpy
+import random
+import times
+import rationals
 
 proc get_size(matrix: seq[seq[int]]): (int, int) {.exportpy.} =
     return (len(matrix), len(matrix[0]))
@@ -106,6 +109,67 @@ proc lcm_n(values: openArray[int]): int {.exportpy.} =
     return result
 
 proc get_matrix_kernel(matrix: seq[seq[int]]): seq[seq[int]] {.exportpy.} =
+    # conver input matrix to rational numbers
+    var m: seq[seq[Rational[int]]]
+    for i in 0..<len(matrix):
+        var row: seq[Rational[int]]
+        for j in 0..<len(matrix[i]):
+            row.add(toRational(matrix[i][j]))
+        m.add(row)
+    var column_index: int = 0
+    var row_index: int = 0
+    while column_index < len(m[0]) and row_index < len(m):
+        var is_find: bool = false
+        var i: int = row_index
+        while not is_find:
+            if m[i][column_index].num != 0:
+                is_find = true
+            else:
+                i += 1
+            if i >= len(m):
+                is_find = true
+        if i >= len(m):
+            column_index += 1
+        else:
+            var a: Rational[int] = m[i][column_index]
+            for j in column_index..<len(m[row_index]):
+                swap(m[row_index][j], m[i][j])
+                m[row_index][j] = m[row_index][j] / a
+            for j in 0..<len(m):
+                if j != row_index:
+                    a = m[j][column_index]
+                    for k in column_index..<len(m[j]):
+                        m[j][k] = m[j][k] - a * m[row_index][k]
+            row_index += 1
+            column_index += 1
+    var main_vars: seq[int]
+    var passive_vars: seq[int]
+    var i: int = 0
+    var j: int = 0
+    while i < len(m) and j < len(m[0]):
+        if m[i][j].num != 0:
+            main_vars.add(j)
+            i += 1
+            j += 1
+        else:
+            passive_vars.add(j)
+            j += 1
+    for k in j..<len(m[0]):
+        passive_vars.add(k)
+    for i in 0..<len(passive_vars):
+        let var_index: int = passive_vars[i]
+        var vector: seq[int]
+        for j in 0..<len(m[0]):
+            vector.add(0)
+        var denominators: seq[int]
+        for j in 0..<len(m):
+            denominators.add(m[j][var_index].den)
+        vector[var_index] = lcm_n(denominators)
+        for j in 0..<len(main_vars):
+            let main_var_index: int = main_vars[j]
+            vector[main_var_index] = (-1 * toRational(vector[var_index]) * m[j][var_index]).num
+
+        result.add(vector)
     return result
 
 proc is_zero_row(row: openArray[int]): bool =
@@ -209,17 +273,42 @@ proc reduce(matrix: seq[seq[int]]): seq[seq[int64]] {.exportpy.} =
             for v in m[i]:
                 row.add(v)
             result.add(row)
-    #[for i in 0..<height:
-        if not is_zero_row(m[i]):
-            var row: seq[int]
-            for v in m[i]:
-                row.add(int(v.limbs[0]))  # <-- here we return not actual value, but it some part in BigInt representation
-            result.add(row)]#
     return result
 
+proc test_reduce(): void =
+    var start_time = cpuTime()
+    randomize()
+    var rand_limit: int = 1
+    var m: seq[seq[int]]
+    for i in 0..<20:
+        var row: seq[int]
+        for j in 0..<20:
+            row.add(rand(2 * rand_limit) - rand_limit)
+        m.add(row)
+    var gen_time = cpuTime()
+    echo("generate matrix time: ", gen_time - start_time)
+    # echo(matrix_to_string(m))
+    var rm = reduce(m)
+    var reduce_time = cpuTime()
+    echo("reduce time: ", reduce_time - gen_time)
+
+proc test_kernel(): void =
+    randomize()
+    var rand_limit: int = 4
+    var m: seq[seq[int]]
+    for i in 0..<12:
+        var row: seq[int]
+        for j in 0..<15:
+            row.add(rand(2 * rand_limit) - rand_limit)
+        m.add(row)
+
+    var kernel = get_matrix_kernel(m)
+
+    echo(matrix_to_string(m))
+    echo(matrix_to_string(kernel))
 
 proc main(): void =
-    var matrix = @[@[1, 2, 3, 4], @[2, 3, 4, 5], @[3, 4, 5, 6]]
+    #[var matrix = @[@[1, 2, 3, 4], @[2, 3, 4, 5], @[3, 4, 5, 6]]
     echo(get_size(matrix))
 
     echo(matrix_to_string(matrix))
@@ -252,6 +341,9 @@ proc main(): void =
     echo(matrix_to_string(e))
     echo(matrix_to_string(w))
     var s = @[@[-3, -1, 6, 3, -6], @[-3, 3, 10, -3, 8], @[3, -6, -9, -3, 3], @[9, 10, -1, -4, -2], @[-10, -3, 7, 2, 10]]
-    echo(reduce(s))
+    echo(reduce(s))]#
+    # test_reduce()
+    test_kernel()
+
 
 # main()
