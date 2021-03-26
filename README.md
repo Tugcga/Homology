@@ -44,3 +44,9 @@ ccc = cc.generate_cochain_complex()
 ```
 
 and calculate groups by using get_homology(i) method.
+
+## Compiled versions of matrix_helper module
+
+By default homology calculations use pure Python version of functions from matrix_helper.py. But it's also possible to use compiled versions of it. MatrixHelper_Nim.pyd is a result of porting functions to nim language. MatrixHelper_Cpp.pyd is a port to c++. Port to c++ use MPIR library for calculations with big integers. There are only to functions, which use bug integers: reduce and get_matrix_kernel. All other functions use int type of values.
+
+There are no reasons to use compiled versions of the module. c++ version slightly faster, near x1.5 - x3 times. Nim version of reduce and get_matrix_kernel functions are slowly.
